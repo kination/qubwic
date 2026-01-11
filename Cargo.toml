@@ -1,0 +1,21 @@
+[package]
+name = "qubic"
+version = "0.0.1"
+edition = "2024"
+
+[dependencies]
+quiche = { version = "0.24", features = ["ffi", "pkg-config-meta", "qlog"] }
+mio = { version = "1.0", features = ["net", "os-poll"] }
+
+ring = "0.17"
+log = "0.4"
+env_logger = "0.11"
+anyhow = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.8"
+slab = "0.4"
+
+
+[[example]]
+name = "client"
+path = "examples/client.rs"

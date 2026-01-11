@@ -1,0 +1,6 @@
+[server]
+address = "127.0.0.1:4433"
+
+[tls]
+cert_file = "certs/cert.pem"
+key_file = "certs/key.pem"
