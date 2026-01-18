@@ -1,12 +1,14 @@
-# QuBWic (QUIC/HTTP/3 Web Server)
+# QuBWic (QUIC/HTTP3 Web Server) - WIP
 
-QuBWic (QUIC Based Web) is Rust-based **QUIC/HTTP/3 exclusive web server** designed for high performance and ultra-low latency. It does not support legacy HTTP/1.x or HTTP/2, focusing entirely on the modern UDP-based HTTP/3 protocol.
+__Status of this project is working-on-progress__
+
+QuBWic (QUIC Based Web) is Rust-based **QUIC/HTTP3 exclusive web server**, designed to achieve high performance and ultra-low latency. It does not support HTTP/1.x or HTTP/2, focusing entirely on modern UDP-based HTTP3 protocol.
 
 
 ## 🚀 Key Features
 
-- QUIC/HTTP/3 Exclusive: Supports only latest QUIC/HTTP3 protocols to reduce complexity.
-- Modular Architecture: Clearly separated layers for Configuration (Config), Connection management, and Protocol (HTTP/3) logic for better maintainability.
+- QUIC/HTTP3 Exclusive: Supports only latest QUIC/HTTP3 protocols to reduce complexity.
+- Modular Architecture: Clearly separated layers for Configuration (Config), Connection management, and Protocol (HTTP3) logic for better maintainability.
 - Flexible Configuration: Fine-tune server behavior via `server.toml`, environment variables, or CLI arguments.
 
 
