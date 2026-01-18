@@ -1,6 +1,6 @@
-mod config;
-mod handler;
-mod tls;
+use qubwic::config;
+use qubwic::connection;
+use qubwic::tls;
 
 use std::net::SocketAddr;
 use std::time::Duration;
@@ -8,18 +8,44 @@ use std::time::Duration;
 use mio::{Events, Interest, Poll, Token};
 use mio::net::UdpSocket;
 use log::error;
+use clap::Parser;
 
 const SERVER: Token = Token(0);
 
 
 fn main() -> anyhow::Result<()> {
-    env_logger::init();
+    // Load configuration with CLI args and environment variables
+    let mut config = match config::load_with_args() {
+        Ok(cfg) => cfg,
+        Err(e) => {
+            eprintln!("Configuration Error:\n{}", e);
+            std::process::exit(1);
+        }
+    };
 
-    let config = config::load("server.toml").expect("Cannot find server config");
-    let mut quiche_config = tls::create_quiche_config(
-        &config.tls.cert_file,
-        &config.tls.key_file,
-    )?;
+    // Apply CLI overrides
+    let args = config::CliArgs::parse();
+    if let Some(level) = args.log_level {
+        config.logging.level = level;
+    }
+    if let Some(addr) = args.address {
+        config.server.address = addr;
+    }
+
+    // Initialize logger with configured level
+    env_logger::Builder::from_env(
+        env_logger::Env::default().default_filter_or(&config.logging.level)
+    ).init();
+
+    log::info!("Starting QuBWic server...");
+    log::info!("Configuration loaded from: {}", args.config);
+    log::info!("Server address: {}", config.server.address);
+    log::info!("Worker threads: {}", config.server.worker_threads);
+    log::info!("QUIC congestion control: {}", config.quic.congestion_control);
+    log::info!("Log level: {}", config.logging.level);
+
+    // Create QUIC configuration
+    let mut quiche_config = tls::create_quiche_config(&config.tls, &config.quic)?;
 
     let addr: SocketAddr = config.server.address.parse().expect("Invalid address");
     let mut socket = UdpSocket::bind(addr).expect("Failed to bind UDP socket");
@@ -27,7 +53,7 @@ fn main() -> anyhow::Result<()> {
     let mut poll = Poll::new().expect("Failed to create Poll");
     poll.registry().register(&mut socket, SERVER, Interest::READABLE).expect("Failed to register socket");
 
-    let mut clients = handler::ClientMap::new();
+    let mut clients = connection::ClientMap::new();
 
     let mut buf = [0u8; 65535];
     let mut events = Events::with_capacity(1024);
@@ -48,7 +74,7 @@ fn main() -> anyhow::Result<()> {
                     loop {
                         match socket.recv_from(&mut buf) {
                             Ok((len, src)) => {
-                                if let Err(e) = handler::handle_packet(
+                                if let Err(e) = connection::handle_packet(
                                     &mut clients,
                                     &mut socket,
                                     &mut buf[..len],
@@ -72,7 +98,7 @@ fn main() -> anyhow::Result<()> {
                 _ => {}
             }
         }
-        handler::handle_write_and_timer(&mut clients, &mut socket)?;
+        connection::handle_write_and_timer(&mut clients, &mut socket)?;
         clients.cleanup();
     }
 }
