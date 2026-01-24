@@ -51,7 +51,7 @@ impl Config {
 
         // Validate QUIC parameters ranges
         if self.quic.max_idle_timeout == 0 {
-            return Err(ConfigError::InvalidQuicParameter {
+            return Err(ConfigError::InvalidParameter {
                 parameter: "max_idle_timeout".to_string(),
                 value: "0".to_string(),
                 message: "Timeout must be greater than 0".to_string(),
@@ -59,7 +59,7 @@ impl Config {
         }
 
         if self.quic.max_udp_payload_size < 1200 {
-            return Err(ConfigError::InvalidQuicParameter {
+            return Err(ConfigError::InvalidParameter {
                 parameter: "max_udp_payload_size".to_string(),
                 value: self.quic.max_udp_payload_size.to_string(),
                 message: "Must be at least 1200 bytes (QUIC minimum)".to_string(),
@@ -67,10 +67,30 @@ impl Config {
         }
 
         if self.quic.max_udp_payload_size > 65535 {
-            return Err(ConfigError::InvalidQuicParameter {
+            return Err(ConfigError::InvalidParameter {
                 parameter: "max_udp_payload_size".to_string(),
                 value: self.quic.max_udp_payload_size.to_string(),
                 message: "Must not exceed 65535 bytes (UDP maximum)".to_string(),
+            });
+        }
+
+        // Validate Server parameters ranges
+        if self.server.read_buffer_size < self.quic.max_udp_payload_size {
+            return Err(ConfigError::InvalidParameter {
+                parameter: "read_buffer_size".to_string(),
+                value: self.server.read_buffer_size.to_string(),
+                message: format!(
+                    "Buffer size must be at least as large as max_udp_payload_size ({})",
+                    self.quic.max_udp_payload_size
+                ),
+            });
+        }
+
+        if self.server.event_capacity == 0 {
+            return Err(ConfigError::InvalidParameter {
+                parameter: "event_capacity".to_string(),
+                value: "0".to_string(),
+                message: "Event capacity must be greater than 0".to_string(),
             });
         }
 

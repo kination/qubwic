@@ -18,8 +18,20 @@ pub struct ServerConfig {
     pub address: String,
     #[serde(default = "default_worker_threads")]
     pub worker_threads: usize,
+    #[serde(default = "default_read_buffer_size")]
+    pub read_buffer_size: usize,
+    #[serde(default = "default_event_capacity")]
+    pub event_capacity: usize,
     #[serde(default)]
     pub pid_file: Option<String>,
+}
+
+fn default_read_buffer_size() -> usize {
+    65535
+}
+
+fn default_event_capacity() -> usize {
+    1024
 }
 
 fn default_worker_threads() -> usize {

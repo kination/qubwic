@@ -27,8 +27,8 @@ pub enum ConfigError {
     #[error("Invalid congestion control algorithm: '{algorithm}'\n  Valid algorithms: cubic, bbr, reno")]
     InvalidCongestionControl { algorithm: String },
 
-    #[error("Invalid QUIC parameter: {parameter}\n  Value: {value}\n  {message}")]
-    InvalidQuicParameter {
+    #[error("Invalid configuration parameter: {parameter}\n  Value: {value}\n  {message}")]
+    InvalidParameter {
         parameter: String,
         value: String,
         message: String,

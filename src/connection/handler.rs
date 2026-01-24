@@ -12,6 +12,7 @@ pub fn handle_packet(
     src: SocketAddr,
     local: SocketAddr,
     config: &mut quiche::Config,
+    accepting_new: bool,
 ) -> anyhow::Result<()> {
     let header = match Header::from_slice(packet, quiche::MAX_CONN_ID_LEN) {
         Ok(v) => v,
@@ -31,6 +32,11 @@ pub fn handle_packet(
     } else {
         if header.ty != quiche::Type::Initial {
             debug!("Dropping packet: no connection for {:?}", conn_id);
+            return Ok(());
+        }
+
+        if !accepting_new {
+            debug!("Dropping Initial packet: server is shutting down");
             return Ok(());
         }
 

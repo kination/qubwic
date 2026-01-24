@@ -26,6 +26,18 @@ impl ServerConfig {
             log::info!("Overriding server.pid_file from env: {}", val);
             self.pid_file = Some(val);
         }
+        if let Ok(val) = std::env::var("QUBIC_SERVER_READ_BUFFER_SIZE") {
+            if let Ok(size) = val.parse::<usize>() {
+                log::info!("Overriding server.read_buffer_size from env: {}", size);
+                self.read_buffer_size = size;
+            }
+        }
+        if let Ok(val) = std::env::var("QUBIC_SERVER_EVENT_CAPACITY") {
+            if let Ok(cap) = val.parse::<usize>() {
+                log::info!("Overriding server.event_capacity from env: {}", cap);
+                self.event_capacity = cap;
+            }
+        }
     }
 }
 

@@ -1,6 +1,6 @@
 use clap::Parser;
 
-/// QuBWic - QUIC/HTTP/3 Web Server
+/// QuBWic - QUIC(HTTP/3) Web Server
 #[derive(Parser, Debug)]
 #[command(name = "qubwic")]
 #[command(version, about, long_about = None)]
@@ -16,4 +16,12 @@ pub struct CliArgs {
     /// Override server address
     #[arg(short, long, env = "QUBIC_SERVER_ADDRESS")]
     pub address: Option<String>,
+    
+    /// Override read buffer size
+    #[arg(long, env = "QUBIC_READ_BUFFER_SIZE")]
+    pub read_buffer_size: Option<usize>,
+
+    /// Override event capacity
+    #[arg(long, env = "QUBIC_EVENT_CAPACITY")]
+    pub event_capacity: Option<usize>,
 }
