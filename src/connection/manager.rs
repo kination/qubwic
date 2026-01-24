@@ -48,6 +48,11 @@ impl ClientMap {
         ConnectionId::from_vec(scid_buf.to_vec())
     }
 
+    /// Check if there are no active connections
+    pub fn is_empty(&self) -> bool {
+        self.clients.is_empty()
+    }
+
     /// Get the minimum timeout across all connections
     pub fn get_timeout(&self) -> Option<Duration> {
         self.clients
@@ -59,6 +64,16 @@ impl ClientMap {
     /// Remove closed connections
     pub fn cleanup(&mut self) {
         self.clients.retain(|_, c| !c.conn.is_closed());
+    }
+
+    /// Gracefully close all connections
+    pub fn close_all(&mut self) {
+        for client in self.clients.values_mut() {
+            if !client.conn.is_closed() {
+                // Application-level close with code 0 (Success)
+                let _ = client.conn.close(true, 0x00, b"Server shutting down");
+            }
+        }
     }
 
     /// Iterate over all clients mutably
