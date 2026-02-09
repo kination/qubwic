@@ -7,11 +7,15 @@ use std::time::Duration;
 
 use mio::{Events, Interest, Poll, Token};
 use mio::net::UdpSocket;
-use log::{error, info};
+use log::{error, info, LevelFilter};
 use clap::Parser;
+use signal_hook::consts::signal::SIGHUP;
+use signal_hook_mio::v1_0::Signals;
+use std::str::FromStr;
 
 const SERVER: Token = Token(0);
 const WAKER: Token = Token(1);
+const SIGNAL: Token = Token(2);
 
 
 fn main() -> anyhow::Result<()> {
@@ -24,13 +28,16 @@ fn main() -> anyhow::Result<()> {
         }
     };
 
-    // Apply CLI overrides
+    // Apply CLI overrides logic
+    // TODO: CLI args are parsed twice (once for config, once for reload), so optimize later
+    //
+    // Note: In a real app we might want to store CLI args to re-apply them on reload
     let args = config::CliArgs::parse();
-    if let Some(level) = args.log_level {
-        config.logging.level = level;
+    if let Some(ref level) = args.log_level {
+        config.logging.level = level.clone();
     }
-    if let Some(addr) = args.address {
-        config.server.address = addr;
+    if let Some(ref addr) = args.address {
+        config.server.address = addr.clone();
     }
     if let Some(size) = args.read_buffer_size {
         config.server.read_buffer_size = size;
@@ -39,10 +46,16 @@ fn main() -> anyhow::Result<()> {
         config.server.event_capacity = cap;
     }
 
-    // Initialize logger with configured level
-    env_logger::Builder::from_env(
-        env_logger::Env::default().default_filter_or(&config.logging.level)
-    ).init();
+    // Initialize logger
+    //  - Initialize env_logger with TRACE (max) level
+    //  - so we can dynamically control the actual output using log::set_max_level later.
+    env_logger::Builder::new()
+        .filter_level(LevelFilter::Trace) // Allow everything through the logger itself
+        .format_timestamp_millis()
+        .init();
+
+    let level = LevelFilter::from_str(&config.logging.level).unwrap_or(LevelFilter::Info);
+    log::set_max_level(level);
 
     log::info!("=========== Starting QuBWic server ===========");
     log::info!("Configuration loaded from: {}", args.config);
@@ -74,6 +87,10 @@ fn main() -> anyhow::Result<()> {
         let _ = w.wake();
     }).expect("Error setting Ctrl-C handler");
 
+    // Signal handling for SIGHUP (Hot Reload)
+    let mut signals = Signals::new(&[SIGHUP])?;
+    poll.registry().register(&mut signals, SIGNAL, Interest::READABLE)?;
+
     let mut clients = connection::ClientMap::new();
 
     let mut buf = vec![0u8; config.server.read_buffer_size];
@@ -86,7 +103,7 @@ fn main() -> anyhow::Result<()> {
             if e.kind() != std::io::ErrorKind::Interrupted {
                 continue;
             }
-            return Err(e.into());
+            // Interrupted by signal if process get here
         }
 
         for event in events.iter() {
@@ -117,8 +134,51 @@ fn main() -> anyhow::Result<()> {
                         }
                     }
                 }
+                SIGNAL => {
+                    for signal in signals.pending() {
+                        match signal {
+                            SIGHUP => {
+                                info!("Received SIGHUP. Reloading configuration...");
+                                match config::load(&args.config) {
+                                    Ok(mut new_config) => {
+                                        // Re-apply CLI args
+                                        if let Some(ref level) = args.log_level {
+                                            new_config.logging.level = level.clone();
+                                        }
+                                        // TODO: 
+                                        // Cannot change bound address or buffer size at runtime
+                                        // without re-binding socket, which drops packets.
+                                        // Only apply "safe" runtime changes.
+
+                                        // Update Log Level and quiche config (temporary)
+                                        let new_level = LevelFilter::from_str(&new_config.logging.level).unwrap_or(LevelFilter::Info);
+                                        log::set_max_level(new_level);
+                                        info!("Log level updated to: {}", new_level);
+
+                                        match tls::create_quiche_config(&new_config.tls, &new_config.quic) {
+                                            Ok(qc) => {
+                                                quiche_config = qc;
+                                                info!("QUIC configuration reloaded successfully.");
+                                            }
+                                            Err(e) => {
+                                                error!("Failed to recreate QUIC config: {}", e);
+                                            }
+                                        }
+
+                                        // Update global config reference
+                                        config = new_config;
+                                    }
+                                    Err(e) => {
+                                        error!("Failed to reload configuration: {}", e);
+                                    }
+                                }
+                            }
+                            _ => unreachable!(),
+                        }
+                    }
+                }
                 WAKER => {
-                    // Waker triggered, check shutdown flag
+                    // TODO: Waker triggered, check shutdown flag
                 }
                 _ => {}
             }
